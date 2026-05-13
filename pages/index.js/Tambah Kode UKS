@@ -1,0 +1,102 @@
+import { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-client';
+
+// Menghubungkan ke "Kabel" yang Anda pasang di Vercel
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
+export default function AppUKS() {
+  const [form, setForm] = useState({ 
+    nama: '', gender: '', tglLahir: '', kelas: '',
+    tensi: '', bb: '', suhu: '', keluhan: '',
+    terapi: '', terapiCustom: '' 
+  });
+
+  const [loading, setLoading] = useState(false);
+
+  const simpanData = async () => {
+    setLoading(true);
+    try {
+      // 1. Simpan ke Database Supabase (Tabel Laporan Kunjungan)
+      const { error } = await supabase
+        .from('Laporan Kunjungan')
+        .insert([
+          { 
+            Nama: form.nama, 
+            Kelas: form.kelas, 
+            'Jenis Kelamin': form.gender,
+            Keluhan: form.keluhan,
+            Usia: form.tglLahir // Supabase akan menghitung format date
+          }
+        ]);
+
+      if (error) throw error;
+
+      // 2. Format Pesan WhatsApp
+      const pesan = `*LAPORAN UKS DIGITAL*%0A` +
+        `--------------------------%0A` +
+        `*Nama:* ${form.nama}%0A` +
+        `*Kelas:* ${form.kelas}%0A` +
+        `*Keluhan:* ${form.keluhan}%0A` +
+        `*Terapi:* ${form.terapi === "Lainnya..." ? form.terapiCustom : form.terapi}`;
+
+      const nomorWA = "628123456789"; // GANTI DENGAN NOMOR TUJUAN
+      window.open(`https://wa.me/${nomorWA}?text=${pesan}`, '_blank');
+      
+      alert("Data berhasil tersimpan di Supabase & WhatsApp terkirim!");
+    } catch (err) {
+      alert("Gagal simpan: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '500px', margin: 'auto' }}>
+      <h2 style={{ textAlign: 'center', color: '#27ae60' }}>🏥 INPUT DATA UKS</h2>
+      
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+        <input placeholder="Nama Lengkap" onChange={(e) => setForm({...form, nama: e.target.value})} style={styles.input} />
+        
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <select onChange={(e) => setForm({...form, gender: e.target.value})} style={styles.input}>
+            <option value="">Pilih Gender</option>
+            <option value="Laki-laki">Laki-laki</option>
+            <option value="Perempuan">Perempuan</option>
+          </select>
+          <input placeholder="Kelas" onChange={(e) => setForm({...form, kelas: e.target.value})} style={styles.input} />
+        </div>
+
+        <input type="date" title="Tanggal Lahir" onChange={(e) => setForm({...form, tglLahir: e.target.value})} style={styles.input} />
+        
+        <textarea placeholder="Keluhan / Diagnosa" onChange={(e) => setForm({...form, keluhan: e.target.value})} style={styles.input} />
+        
+        <select onChange={(e) => setForm({...form, terapi: e.target.value})} style={styles.input}>
+          <option value="">-- Pilih Terapi --</option>
+          <option value="Istirahat">Istirahat</option>
+          <option value="Paracetamol">Paracetamol</option>
+          <option value="Lainnya...">Lainnya...</option>
+        </select>
+
+        {form.terapi === "Lainnya..." && (
+          <input placeholder="Ketik terapi lain..." onChange={(e) => setForm({...form, terapiCustom: e.target.value})} style={styles.input} />
+        )}
+
+        <button 
+          onClick={simpanData} 
+          disabled={loading}
+          style={{...styles.button, backgroundColor: loading ? '#bdc3c7' : '#27ae60'}}
+        >
+          {loading ? 'MENYIMPAN...' : 'SIMPAN & KIRIM WA'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const styles = {
+  input: { padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '16px' },
+  button: { padding: '16px', borderRadius: '8px', border: 'none', color: 'white', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }
+};
